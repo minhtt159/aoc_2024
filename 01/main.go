@@ -35,7 +35,7 @@ func read_input(file_name string) ([]string, []string) {
 }
 
 func main_01() {
-	file_name := "real_input_01.txt"
+	file_name := "real_input.txt"
 	a, b := read_input(file_name)
 	a_int, b_int := []int{}, []int{}
 	for i := 0; i < len(a); i++ {
@@ -66,7 +66,7 @@ func main_01() {
 }
 
 func main_02() {
-	file_name := "real_input_02.txt"
+	file_name := "real_input.txt"
 	a, b := read_input(file_name)
 	b_str := strings.Join(b, ", ")
 	result := 0

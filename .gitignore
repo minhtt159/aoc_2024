@@ -1,5 +1,2 @@
-*
-!README.md
-!go.mod
-!main.go
+*.txt
 !input.txt
