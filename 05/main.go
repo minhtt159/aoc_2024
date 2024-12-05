@@ -52,6 +52,7 @@ func CheckLine(tokens []int, rules map[int][]int) (bool, int) {
 func FixLine(tokens []int, rules map[int][]int) int {
 	// fmt.Println(tokens)
 	for {
+		// bubble sort until comply
 		for k, rule := range rules {
 			if !slices.Contains(tokens, k) {
 				continue
@@ -63,19 +64,21 @@ func FixLine(tokens []int, rules map[int][]int) int {
 				b := slices.Index(tokens, v)
 				// fmt.Println(k, v, a, b)
 				if a > b && a != -1 && b != -1 {
+					// fmt.Println("Swapping", tokens[a], tokens[b])
 					tokens[a], tokens[b] = tokens[b], tokens[a]
 				}
 			}
 		}
 		if isComply, mid := CheckLine(tokens, rules); isComply {
+			// fmt.Println(tokens)
 			return mid
 		}
 	}
 }
 
 func main() {
-	// file_name := "input.txt"
-	file_name := "real_input.txt"
+	file_name := "input.txt"
+	// file_name := "real_input.txt"
 	input := read_input(file_name)
 	r_order := regexp.MustCompile(`(\d+)|(\d+)`)
 
