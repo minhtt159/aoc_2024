@@ -131,14 +131,16 @@ func main() {
 		// if i%100 == 0 {
 		// 	fmt.Println(i)
 		// }
-		new_obstacle := path[i]
+		new_obstacle := Pair{
+			path[i].x,
+			path[i].y,
+			-1.0,
+		}
 		// fmt.Println("New obstacle: ", new_obstacle)
-		obstacles = append(obstacles,
-			Pair{
-				new_obstacle.x,
-				new_obstacle.y,
-				-1,
-			})
+		if slices.Contains(possible_obstacles, new_obstacle) {
+			continue
+		}
+		obstacles = append(obstacles, new_obstacle)
 		guard = orig_guard
 		new_input := []string{}
 		for _, line := range orig_input {
@@ -150,10 +152,8 @@ func main() {
 			err, guard = next_step(new_input, guard, obstacles, new_path)
 			if !err {
 				if (guard == Pair{}) {
-					if !slices.Contains(possible_obstacles, Pair{new_obstacle.x, new_obstacle.y, -1}) {
-						possible_obstacles = append(possible_obstacles, Pair{new_obstacle.x, new_obstacle.y, -1})
-					}
-					// fmt.Println("Possible obstacles: ", path[i])
+					possible_obstacles = append(possible_obstacles, new_obstacle)
+					// fmt.Println("Possible obstacles: ", new_obstacle)
 					// for _, line := range new_input {
 					// 	fmt.Println(line)
 					// }
