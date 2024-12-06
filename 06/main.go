@@ -61,93 +61,63 @@ func fillx(input []string, row int, col int, c rune) {
 	input[row] = input[row][:col] + string(c) + input[row][col+1:]
 }
 
+func next_step(input []string, guard Pair, obstacles []Pair, path []Pair) (bool, Pair) {
+	turn := guard.d
+	new_x := guard.x + dir_x[turn]
+	new_y := guard.y + dir_y[turn]
+
+	if new_x < 0 || new_x >= len(input) || new_y < 0 || new_y >= len(input[0]) {
+		// fmt.Println("Out of bound, exit")
+		return false, Pair{new_x, new_y, -1}
+	}
+
+	if slices.Contains(obstacles, Pair{new_x, new_y, -1}) {
+		// fmt.Println("Obstacle detected, pivot")
+		turn = (turn + 1) % 4
+		guard = Pair{guard.x, guard.y, turn}
+		return true, guard
+	}
+
+	if slices.Contains(path, Pair{new_x, new_y, turn}) {
+		// fmt.Println("Loop detected, exit")
+		return false, Pair{}
+	}
+
+	// Normal move, continue
+	guard = Pair{new_x, new_y, turn}
+	fillx(input, guard.x, guard.y, 'X')
+	return true, guard
+}
+
 func main() {
-	file_name := "input.txt"
-	// file_name := "real_input.txt"
+	// file_name := "input.txt"
+	file_name := "real_input.txt"
 	input, guard, obstacles := read_input(file_name)
 	// fmt.Println(input)
 	// fmt.Println(guard)
 	// fmt.Println(obstacles)
+	orig_guard := Pair{
+		guard.x,
+		guard.y,
+		guard.d,
+	}
+	orig_input := []string{}
+	for _, line := range input {
+		orig_input = append(orig_input, line)
+	}
+	// fmt.Println(orig_input)
 
-	TURN := 0
-	possible_obstacles := 0
+	path := []Pair{}
+	var err bool
 	for {
-		// Try do move the guard
-		new_x := guard.x + dir_x[TURN]
-		new_y := guard.y + dir_y[TURN]
-		if new_x < 0 || new_x >= len(input) || new_y < 0 || new_y >= len(input[0]) {
-			// Guard moved out of the map, exit
+		err, guard = next_step(input, guard, obstacles, path)
+		if !err {
 			break
 		}
-		if slices.Contains(obstacles, Pair{new_x, new_y, -1}) {
-			// Guard meet an obstacles, pivot
-			TURN = (TURN + 1) % 4
-			continue
-		}
-
-		// Guard can move, commit the move
-		guard = Pair{new_x, new_y, TURN}
-		fillx(input, guard.x, guard.y, 'X')
-
-		// Try to place an obstacle in the front
-		obstacles = append(obstacles,
-			Pair{
-				guard.x + dir_x[TURN],
-				guard.y + dir_y[TURN],
-				-1,
-			})
-
-		// Pivot to see if there is any loop can be achieved
-		trial_turn := (TURN + 1) % 4
-		dummy_guard := Pair{
-			guard.x,
-			guard.y,
-			guard.d,
-		}
-		dummy_stack := []Pair{dummy_guard}
-		can_place_obs := false
-
-		for {
-			forward_x := dummy_guard.x + dir_x[trial_turn]
-			forward_y := dummy_guard.y + dir_y[trial_turn]
-
-			if forward_x < 0 || forward_x >= len(input) || forward_y < 0 || forward_y >= len(input[0]) {
-				// Look ahead but out of map, break
-				break
-			}
-
-			if slices.Contains(obstacles, Pair{forward_x, forward_y, -1}) {
-				// Look ahead but hit an obstacle, pivot and continue
-				trial_turn = (trial_turn + 1) % 4
-				continue
-			}
-
-			// Try the move
-			dummy_guard = Pair{
-				forward_x,
-				forward_y,
-				trial_turn,
-			}
-			// Check if this step is already committed
-			if slices.Contains(dummy_stack, dummy_guard) {
-				can_place_obs = true
-				fmt.Println(dummy_stack)
-				fmt.Println("Loop detected, place obstacles at", guard.x+dir_x[TURN], guard.y+dir_y[TURN])
-				for _, line := range input {
-					fmt.Println(line)
-				}
-				break
-			}
-			// Commit the move
-			dummy_stack = append(dummy_stack, dummy_guard)
-		}
-		if can_place_obs {
-			possible_obstacles++
-		}
-
-		// Remove the obstacle
-		obstacles = obstacles[:len(obstacles)-1]
+		// fmt.Println(guard)
+		path = append(path, guard)
 	}
+	// fmt.Println(path)
 
 	after_cnt := 0
 	for _, line := range input {
@@ -156,7 +126,45 @@ func main() {
 	}
 	fmt.Println(after_cnt)
 
-	fmt.Println(possible_obstacles)
-
-	// daySix()
+	possible_obstacles := []Pair{}
+	for i := 1; i < len(path); i++ {
+		// if i%100 == 0 {
+		// 	fmt.Println(i)
+		// }
+		new_obstacle := path[i]
+		// fmt.Println("New obstacle: ", new_obstacle)
+		obstacles = append(obstacles,
+			Pair{
+				new_obstacle.x,
+				new_obstacle.y,
+				-1,
+			})
+		guard = orig_guard
+		new_input := []string{}
+		for _, line := range orig_input {
+			new_input = append(new_input, line)
+			// fmt.Println(line)
+		}
+		new_path := []Pair{}
+		for {
+			err, guard = next_step(new_input, guard, obstacles, new_path)
+			if !err {
+				if (guard == Pair{}) {
+					if !slices.Contains(possible_obstacles, Pair{new_obstacle.x, new_obstacle.y, -1}) {
+						possible_obstacles = append(possible_obstacles, Pair{new_obstacle.x, new_obstacle.y, -1})
+					}
+					// fmt.Println("Possible obstacles: ", path[i])
+					// for _, line := range new_input {
+					// 	fmt.Println(line)
+					// }
+				}
+				break
+			}
+			// fmt.Println(guard)
+			new_path = append(new_path, guard)
+		}
+		// Remove the obstacle
+		obstacles = obstacles[:len(obstacles)-1]
+	}
+	fmt.Println(len(possible_obstacles))
 }
