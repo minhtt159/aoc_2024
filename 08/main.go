@@ -26,7 +26,7 @@ func read_input(file_name string) []string {
 type Antenna struct {
 	x int
 	y int
-	d rune
+	d rune // I don't need this field, but it's here for consistency
 }
 
 func fillx(input []string, row int, col int, c rune) {
@@ -103,7 +103,7 @@ func main() {
 						if input[b_x][b_y] == '.' {
 							fillx(input, b_x, b_y, '#')
 						} else {
-							// fmt.Println("Potential antinode a is not empty")
+							// fmt.Println("Potential antinode b is not empty")
 						}
 						antinode := Antenna{b_x, b_y, '#'}
 						if !slices.Contains(antinodes, antinode) {
