@@ -105,11 +105,11 @@ func countStoneWithCache2(cache map[int]map[int]int, blinker func(stoneInt int) 
 	}
 	blinkResult := blinker(stoneInt)
 	if blinks == 1 {
-		// lastResult = append(lastResult, blinkResult.first)
+		lastResult = append(lastResult, blinkResult.first)
 		if blinkResult.second == -1 {
 			cache[stoneInt][blinks] = 1
 		} else {
-			// lastResult = append(lastResult, blinkResult.second)
+			lastResult = append(lastResult, blinkResult.second)
 			cache[stoneInt][blinks] = 2
 		}
 	} else {
@@ -159,6 +159,6 @@ func main() {
 		// break
 	}
 
+	// fmt.Println(lastResult)
 	fmt.Println(result)
-	fmt.Println(lastResult)
 }
