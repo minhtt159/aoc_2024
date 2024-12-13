@@ -39,8 +39,8 @@ func parseClaw(input string) Claw {
 }
 
 func main() {
-	// file_name := "input.txt"
-	file_name := "real_input.txt"
+	file_name := "input.txt"
+	// file_name := "real_input.txt"
 	input := read_input(file_name)
 	// fmt.Println(input)
 
@@ -50,7 +50,7 @@ func main() {
 		a := parseClaw(input[i])
 		b := parseClaw(input[i+1])
 		target := parseClaw(input[i+2])
-		target = Claw{target.x + 10000000000000, target.y + 10000000000000}
+		// target = Claw{target.x + 10000000000000, target.y + 10000000000000}
 
 		// It's math
 		// 8400 = a * 94 + b * 22
@@ -65,7 +65,7 @@ func main() {
 		num_a, num_b := 0, 0
 		// Calc
 		left := target.y*a.x - target.x*a.y
-		right := b.y*a.x - b.x*a.y
+		right := b.y*a.x - b.x*a.y // If this is 0, we'll have a bad day
 		// fmt.Println(left, right)
 		if left%right == 0 {
 			num_b = left / right
