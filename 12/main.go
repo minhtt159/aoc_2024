@@ -1,24 +1,29 @@
 package main
 
 import (
-	"bufio"
+	_ "embed"
 	"fmt"
-	"log"
-	"os"
-	"reflect"
 	"sort"
+	"strings"
 )
 
-func read_input(file_name string) []string {
+//go:embed input.txt
+var test_input string // 1930, 1206
+
+var (
+	input_2 = "AAAA\nBBCD\nBBCC\nEEEC"            // 140, 80
+	input_3 = "OOOOO\nOXOXO\nOOOOO\nOXOXO\nOOOOO" // 772, 436
+)
+
+//go:embed real_input.txt
+var real_input string
+
+func read_input(input string) []string {
 	result := []string{}
-	file, err := os.Open(file_name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
+	for _, line := range strings.Split(input, "\n") {
+		if len(line) == 0 {
+			continue
+		}
 		result = append(result, line)
 	}
 	return result
@@ -29,96 +34,133 @@ var (
 	dir_y = []int{0, -1, 1, 0}
 )
 
+const (
+	U = iota
+	L
+	R
+	D
+)
+
 type Plot struct {
-	id      rune
-	area    int
-	peri    int
-	corners int
+	x int
+	y int
+	d int
 }
 
-func BFS(garden []string, visited map[int]map[int]bool, target rune, x int, y int) (bool, Plot) {
-	if garden[x][y] != byte(target) {
-		return false, Plot{0, 0, 0, 0}
+func getNeighbors(target Plot) []Plot {
+	return []Plot{
+		{target.x + dir_x[U], target.y + dir_y[U], U},
+		{target.x + dir_x[L], target.y + dir_y[L], L},
+		{target.x + dir_x[R], target.y + dir_y[R], R},
+		{target.x + dir_x[D], target.y + dir_y[D], D},
 	}
-	if visited[x][y] {
-		return true, Plot{0, 0, 0, 0}
-	}
-	visited[x][y] = true
+}
+
+func DFS(garden []string, visited [][]bool, target Plot, plots *[]Plot) (int, int) {
+	visited[target.x][target.y] = true
 	totalArea := 1
 	totalPeri := 0
 
-	// for part 2
-	totalCorners := 0
-	adj := []int{}
-
-	for k := 0; k < 4; k++ {
-		new_x := x + dir_x[k]
-		new_y := y + dir_y[k]
-		if new_x < 0 || new_x >= len(garden) || new_y < 0 || new_y >= len(garden[0]) {
-			// Out of bound
+	for _, plot := range getNeighbors(target) {
+		if plot.x < 0 || plot.x >= len(garden) || plot.y < 0 || plot.y >= len(garden[0]) ||
+			garden[target.x][target.y] != garden[plot.x][plot.y] {
+			// Out of bound or not the same kind
 			totalPeri++
-		} else if ok, nextPlot := BFS(garden, visited, target, new_x, new_y); ok {
-			// Neighbor plot is the same kind as this plot
-			totalArea += nextPlot.area
-			totalPeri += nextPlot.peri
 
-			// for part 2
-			totalCorners += nextPlot.corners
-			adj = append(adj, k)
-		} else {
-			// Neighbor plot is not the same kind as this plot
-			totalPeri++
+			// For part 2,
+			// Add the neighbor plot as the inner/outer bounds
+			*plots = append(*plots, plot)
+
+		} else if !visited[plot.x][plot.y] {
+			// Visit the neighbor and add the area and perimeter
+			a, p := DFS(garden, visited, plot, plots)
+			totalArea += a
+			totalPeri += p
 		}
 	}
 
-	// for part 2
-	sort.Ints(adj)
-	if len(adj) == 0 {
-		fmt.Println("Plot", x, y, "has no adjecent plot")
-		totalCorners += 4
-	} else if len(adj) == 1 {
-		// True corner
-		fmt.Println("Plot", x, y, "has only one adjecent plot")
-		totalCorners += 3
-	} else if reflect.DeepEqual(adj, []int{0, 2}) || reflect.DeepEqual(adj, []int{1, 3}) {
-		// L shape
-		fmt.Println("Plot", x, y, "has L shape")
-		totalCorners += 2
+	return totalArea, totalPeri
+}
+
+func countCorner(plots []Plot) int {
+	listSides := make(map[Plot]bool)
+	totalSide := 0
+
+	// Sort the plots by row then column,
+	// because when iterating the list,
+	// the sides are added sequentially
+	sort.Slice(plots, func(i int, j int) bool {
+		if plots[i].x == plots[j].x {
+			return plots[i].y < plots[j].y
+		}
+		return plots[i].x < plots[j].x
+	})
+	// fmt.Println("Plots", plots)
+
+	// Plots is a list of outer/inner bounds
+	for _, plot := range plots {
+		found := false
+
+		// check if the neighbor with this direction is already in the list
+		for _, neighbor := range getNeighbors(plot) {
+			neighbor.d = plot.d
+			if _, ok := listSides[neighbor]; ok {
+				found = true
+				// fmt.Println("Found side", plot, neighbor)
+				break
+			}
+		}
+
+		// if this side hasn't been added before
+		if !found {
+			totalSide++
+		}
+		listSides[plot] = true
 	}
 
-	return true, Plot{target, totalArea, totalPeri, totalCorners}
+	// fmt.Println(listSides)
+	return totalSide
 }
 
 func main() {
-	file_name := "input.txt"
-	// file_name := "real_input.txt"
-	input := read_input(file_name)
-	input = []string{"AAAA", "BBCD", "BBCC", "EEEC"}
-	// input = []string{"OOOOO", "OXOXO", "OOOOO", "OXOXO", "OOOOO"}
+	file := test_input
+	// file = input_2
+	// file = input_3
+	file = real_input
+	input := read_input(file)
+	for _, line := range input {
+		fmt.Println(line)
+	}
 
-	visited := make(map[int]map[int]bool)
+	visited := make([][]bool, len(input))
 	for i, line := range input {
-		visited[i] = make(map[int]bool, len(line))
+		visited[i] = make([]bool, len(line))
 		for j := range line {
 			visited[i][j] = false
 		}
 	}
 
-	allPlots := []Plot{}
+	r1 := 0
+	r2 := 0
 	for i, line := range input {
-		for j, c := range line {
-			if visited[i][j] {
-				continue
+		for j := range line {
+			if !visited[i][j] {
+				plots := make([]Plot, 0)
+				area, peri := DFS(input, visited, Plot{i, j, 0}, &plots)
+				corners := countCorner(plots)
+				fmt.Printf("Plot %c has area %d, perimeter %d, and corner %d\n",
+					input[i][j],
+					area,
+					peri,
+					corners,
+				)
+				r1 += area * peri
+				r2 += area * corners
+				// log.Fatal("break")
 			}
-			_, plot := BFS(input, visited, c, i, j)
-			allPlots = append(allPlots, plot)
 		}
 	}
 
-	result := 0
-	for _, plot := range allPlots {
-		fmt.Printf("Plot %c has area %d, perimeter %d, and corner %d\n", plot.id, plot.area, plot.peri, plot.corners)
-		result += plot.area * plot.peri
-	}
-	fmt.Println(result)
+	fmt.Println("Result 1:", r1)
+	fmt.Println("Result 2:", r2)
 }
