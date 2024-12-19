@@ -18,10 +18,15 @@ type Towel struct {
 	result_patterns []string
 }
 
-func parseInput(input string) (patterns []string, desires []string) {
+func parseInput(input string) (map[string]bool, []string) {
 	allLines := strings.Split(input, "\n")
-	patterns = strings.Split(allLines[0], ", ")
 
+	patterns := make(map[string]bool)
+	for _, p := range strings.Split(allLines[0], ", ") {
+		patterns[p] = true
+	}
+
+	desires := make([]string, 0)
 	for _, d := range allLines[1:] {
 		if len(d) > 0 {
 			desires = append(desires, d)
@@ -30,61 +35,68 @@ func parseInput(input string) (patterns []string, desires []string) {
 	return patterns, desires
 }
 
-func findStripe(desired string, patterns []string) (bool, int) {
-	allResult := [][]string{}
-	all_patterns := map[string]bool{}
-	for _, p := range patterns {
-		all_patterns[p] = true
+var cache = make(map[string]int)
+
+func findStripe(desired string, patterns map[string]bool) (bool, int) {
+	if cached, ok := cache[desired]; ok {
+		return ok, cached
+	} else if len(desired) == 0 {
+		// done
+		return true, 1
+	} else if len(patterns) == 0 {
+		// no
+		return false, 0
 	}
-	queue := []Towel{{
-		desired,
-		all_patterns,
-		[]string{},
-	}}
 
-	for len(queue) > 0 {
-		this_towel := queue[0]
-		queue = queue[1:]
+	total := 0
+	new_patterns := getNewPattern(patterns)
 
-		if len(this_towel.desired) == 0 {
-			allResult = append(allResult, this_towel.result_patterns)
+	for p, ok := range new_patterns {
+		if !ok || !strings.Contains(desired, p) {
+			delete(patterns, p)
 			continue
 		}
+	}
 
-		for p, ok := range this_towel.patterns {
-			if len(p) > len(this_towel.desired) || !ok {
-				continue
-			}
-			if !strings.Contains(this_towel.desired, p) {
-				this_towel.patterns[p] = false
-			}
-			if p == this_towel.desired[:len(p)] {
-				queue = append(queue, Towel{
-					this_towel.desired[len(p):],
-					this_towel.patterns,
-					append(this_towel.result_patterns, p),
-				})
+	// fmt.Println("DEBUG", desired, patterns)
+
+	for p := range new_patterns {
+		if len(p) > len(desired) {
+			continue
+		}
+		if p == desired[:len(p)] {
+			if new_ok, r := findStripe(desired[len(p):], getNewPattern(patterns)); new_ok {
+				total += r
 			}
 		}
 	}
+	// fmt.Println("Caching", desired, total)
+	cache[desired] = total
+	return total != 0, total
+}
 
-	if len(allResult) != 0 {
-		fmt.Println(allResult)
-		return true, len(allResult)
+func getNewPattern(patterns map[string]bool) map[string]bool {
+	new_patterns := make(map[string]bool)
+	for p, ok := range patterns {
+		if !ok {
+			continue
+		}
+		new_patterns[p] = true
 	}
-	return false, 0
+	return new_patterns
 }
 
 func main() {
-	allInput := input
-	// allInput := realInput
+	// allInput := input
+	allInput := realInput
 	patterns, desires := parseInput(allInput)
 	// fmt.Println(patterns, desires)
 
 	cnt := 0
 	cnt2 := 0
 	for _, d := range desires {
-		if ok, r := findStripe(d, patterns); ok {
+		new_patterns := getNewPattern(patterns)
+		if ok, r := findStripe(d, new_patterns); ok {
 			fmt.Println("found", d, r)
 			cnt++
 			cnt2 += r
