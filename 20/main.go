@@ -3,6 +3,7 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"math"
 	"slices"
 	"strings"
 )
@@ -20,17 +21,9 @@ type Pos struct {
 }
 
 type Route struct {
-	path  []Pos
-	wall1 Pos
-	wall2 Pos
-	cur   Pos
-	score int
+	path []Pos
+	cur  Pos
 }
-
-var (
-	dir_x = []int{-1, 0, 1, 0}
-	dir_y = []int{0, -1, 0, 1}
-)
 
 const (
 	U = iota
@@ -62,16 +55,13 @@ func parseMaze(input string) ([][]byte, Pos) {
 }
 
 func debugMaze(maze [][]byte, route Route) {
-	fmt.Println("Score :", route.score)
+	fmt.Println("Score :", len(route.path))
 
-	wallList := []Pos{route.wall1, route.wall2}
 	for i := 0; i < len(maze); i++ {
 		line := make([]byte, len(maze))
 		copy(line, maze[i])
 		for j := 0; j < len(maze[0]); j++ {
-			if slices.Contains(wallList, Pos{i, j, -1}) {
-				line[j] = 'X'
-			} else if slices.Contains(route.path, Pos{i, j, -1}) {
+			if slices.Contains(route.path, Pos{i, j, -1}) {
 				line[j] = '0'
 			}
 		}
@@ -79,24 +69,45 @@ func debugMaze(maze [][]byte, route Route) {
 	}
 }
 
-var nonBreakScore int
+type Case struct {
+	input     string
+	target    int
+	cheat_num int
+}
 
-func Dijkstra(maze [][]byte, cur Pos, wallBreak bool) (int, int) {
+var (
+	dir_x = []int{-1, 0, 1, 0}
+	dir_y = []int{0, -1, 0, 1}
+	case1 = Case{
+		ex_input,
+		2,
+		2,
+	}
+	case2 = Case{
+		ex_input,
+		50,
+		20,
+	}
+	case3 = Case{
+		real_input,
+		100,
+		2,
+	}
+	case4 = Case{
+		real_input,
+		100,
+		20,
+	}
+)
+
+func Dijkstra(maze [][]byte, cur Pos) (int, []Pos) {
 	bestScore := 0
-	bestRoutes := []Route{}
-
+	bestRoute := []Pos{}
 	S := Route{
 		[]Pos{cur}, // steps in this route
-		Pos{-1, -1, -1},
-		Pos{-1, -1, -1},
 		cur,
-		0, // score of this route
 	}
 
-	if !wallBreak {
-		S.wall1 = Pos{len(maze), -1, -1}
-		S.wall2 = Pos{len(maze), -1, -1}
-	}
 	queue := []Route{S}
 
 	for len(queue) > 0 {
@@ -110,13 +121,11 @@ func Dijkstra(maze [][]byte, cur Pos, wallBreak bool) (int, int) {
 
 		if maze[state.cur.x][state.cur.y] == 'E' {
 			// Done
-			debugMaze(maze, state)
-			bestScore = state.score
-			bestRoutes = append(bestRoutes, state)
-			if !wallBreak {
-				break
-			}
-			continue
+			score := len(state.path) - 1
+			// debugMaze(maze, state)
+			bestScore = score
+			bestRoute = state.path
+			break
 		}
 
 		for i := 0; i < 4; i++ {
@@ -125,50 +134,53 @@ func Dijkstra(maze [][]byte, cur Pos, wallBreak bool) (int, int) {
 				// out of bound
 				continue
 			}
-			if (state.wall1.x == -1 && state.wall2.x == -1) || !wallBreak {
-
+			if maze[next_pos.x][next_pos.y] != '#' {
 				if slices.Contains(state.path, next_pos) {
 					// Already visited
 					continue
 				}
 
-				if maze[next_pos.x][next_pos.y] == '#' && wallBreak {
-					if state.wall1.x == 1 {
-						state.wall1 = next_pos
-					} else if state.wall1.x != 1 && state.wall2.x == -1 {
-						state.wall2 = next_pos
-					} else {
-						continue
-					}
-				}
-
 				// Make a copy of the steps
 				newSteps := make([]Pos, len(state.path))
 				copy(newSteps, state.path)
+				newRoute := Route{
+					append(newSteps, next_pos),
+					next_pos,
+				}
 
 				// Queue this position
-				queue = append(queue, Route{
-					append(newSteps, next_pos),
-					Pos{state.wall1.x, state.wall1.y, -1},
-					Pos{state.wall2.x, state.wall2.y, -1},
-					next_pos,
-					state.score + 1,
-				})
+				queue = append(queue, newRoute)
 			}
 		}
 	}
 
-	fmt.Println("Best routes:", bestRoutes)
-	return bestScore, len(bestRoutes)
+	return bestScore, bestRoute
 }
 
 func main() {
-	input := ex_input
+	xxx := case4
+	input, target, cheat_num := xxx.input, xxx.target, xxx.cheat_num
+	// input := real_input
 	maze, start := parseMaze(input)
 
-	r, s := Dijkstra(maze, start, false)
-	fmt.Println("Result:", r, s)
+	max_score, route := Dijkstra(maze, start)
+	fmt.Println("Origin path:", max_score)
 
-	r2, s2 := Dijkstra(maze, start, true)
-	fmt.Println("Result:", r2, s2)
+	r := 0
+	for a := 0; a < len(route); a++ {
+		pa := route[a]
+		for b := a + target + 1; b < len(route); b++ {
+			pb := route[b]
+			dx := math.Abs(float64(pb.x - pa.x))
+			dy := math.Abs(float64(pb.y - pa.y))
+			d := int(dx + dy)
+
+			if d <= cheat_num && b-a-d >= target {
+				// fmt.Println("Cheat:", a, b, d)
+				r++
+			}
+
+		}
+	}
+	fmt.Println("Cheat:", r)
 }
