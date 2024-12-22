@@ -1,15 +1,19 @@
 package main
 
 import (
-	"bufio"
+	_ "embed"
 	"fmt"
-	"log"
-	"os"
 	"slices"
 	"strings"
 )
 
-type Pair struct {
+//go:embed input.txt
+var ex_input string
+
+//go:embed real_input.txt
+var real_input string
+
+type Pos struct {
 	x int
 	y int
 	d int
@@ -20,151 +24,134 @@ var (
 	dir_y = []int{0, 1, 0, -1}
 )
 
-func read_input(file_name string) ([]string, Pair, []Pair) {
-	result := []string{}
-	file, err := os.Open(file_name)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer file.Close()
+func read_input(input string) ([][]byte, Pos, []Pos) {
+	var guard Pos
+	obstacles := []Pos{}
+	all_lines := strings.Split(input, "\n")
+	result := make([][]byte, len(all_lines)-1)
 
-	var guard Pair
-	var obstacles []Pair
-
-	scanner := bufio.NewScanner(file)
-	for scanner.Scan() {
-		line := scanner.Text()
-		result = append(result, line)
-
-		if strings.Contains(line, "^") {
-			guard = Pair{
-				len(result) - 1,
-				strings.Index(line, "^"),
-				0,
-			}
+	for i, line := range all_lines {
+		if len(line) == 0 {
+			continue
 		}
-		for i, c := range line {
-			if c == '#' {
+		result[i] = make([]byte, len(line))
+		for j, r := range line {
+			result[i][j] = byte(r)
+			switch r {
+			case '#':
 				obstacles = append(obstacles,
-					Pair{
-						len(result) - 1,
+					Pos{
 						i,
+						j,
 						-1,
 					})
+			case '^':
+				guard = Pos{
+					i,
+					j,
+					0,
+				}
 			}
 		}
 	}
 	return result, guard, obstacles
 }
 
-func fillx(input []string, row int, col int, c rune) {
-	input[row] = input[row][:col] + string(c) + input[row][col+1:]
-}
-
-func next_step(input []string, guard Pair, obstacles []Pair, path []Pair) (bool, Pair) {
-	turn := guard.d
-	new_x := guard.x + dir_x[turn]
-	new_y := guard.y + dir_y[turn]
-
-	if new_x < 0 || new_x >= len(input) || new_y < 0 || new_y >= len(input[0]) {
-		// fmt.Println("Out of bound, exit")
-		return false, Pair{new_x, new_y, -1}
-	}
-
-	if slices.Contains(obstacles, Pair{new_x, new_y, -1}) {
-		// fmt.Println("Obstacle detected, pivot")
-		turn = (turn + 1) % 4
-		guard = Pair{guard.x, guard.y, turn}
-		return true, guard
-	}
-
-	if slices.Contains(path, Pair{new_x, new_y, turn}) {
-		// fmt.Println("Loop detected, exit")
-		return false, Pair{}
-	}
-
-	// Normal move, continue
-	guard = Pair{new_x, new_y, turn}
-	fillx(input, guard.x, guard.y, 'X')
-	return true, guard
-}
-
-func main() {
-	// file_name := "input.txt"
-	file_name := "real_input.txt"
-	input, guard, obstacles := read_input(file_name)
-	// fmt.Println(input)
-	// fmt.Println(guard)
-	// fmt.Println(obstacles)
-	orig_guard := Pair{
+func walk(input [][]byte, guard Pos, obstacles []Pos) (bool, []Pos) {
+	this_guard := Pos{
 		guard.x,
 		guard.y,
 		guard.d,
 	}
-	orig_input := []string{}
-	for _, line := range input {
-		orig_input = append(orig_input, line)
-	}
-	// fmt.Println(orig_input)
-
-	path := []Pair{}
-	var err bool
+	path := []Pos{this_guard}
 	for {
-		err, guard = next_step(input, guard, obstacles, path)
-		if !err {
+		turn := this_guard.d
+		new_guard := Pos{
+			this_guard.x + dir_x[turn],
+			this_guard.y + dir_y[turn],
+			turn,
+		}
+
+		if new_guard.x < 0 || new_guard.x >= len(input) || new_guard.y < 0 || new_guard.y >= len(input[0]) {
+			// fmt.Println("Out of bound, exit")
 			break
 		}
-		// fmt.Println(guard)
-		path = append(path, guard)
-	}
-	// fmt.Println(path)
 
-	after_cnt := 0
-	for _, line := range input {
-		after_cnt += len(line) - strings.Count(line, "#") - strings.Count(line, ".")
-		// fmt.Println(line)
-	}
-	fmt.Println(after_cnt)
+		if slices.Contains(path, Pos{new_guard.x, new_guard.y, turn}) {
+			// fmt.Println("Loop detected, exit")
+			return false, []Pos{}
+		}
 
-	possible_obstacles := []Pair{}
+		if slices.Contains(obstacles, Pos{new_guard.x, new_guard.y, -1}) {
+			// fmt.Println("Obstacle detected, pivot")
+			new_guard = Pos{
+				this_guard.x,
+				this_guard.y,
+				(this_guard.d + 1) % 4,
+			}
+		} else {
+			// Normal move, continue
+			input[new_guard.x][new_guard.y] = 'X'
+		}
+
+		path = append(path, new_guard)
+		this_guard = new_guard
+	}
+	// fmt.Println("path", path)
+
+	result := []Pos{}
+	for _, p := range path {
+		if slices.Contains(result, Pos{p.x, p.y, -1}) {
+			continue
+		}
+		result = append(result, Pos{p.x, p.y, -1})
+	}
+
+	return true, result
+}
+
+func debug(input [][]byte, path []Pos) {
+	for i, line := range input {
+		for j, r := range line {
+			if slices.Contains(path, Pos{i, j, -1}) {
+				fmt.Print("X")
+			} else {
+				fmt.Print(string(r))
+			}
+		}
+		fmt.Println()
+	}
+}
+
+func main() {
+	// file_name := ex_input
+	file_name := real_input
+	input, guard, obstacles := read_input(file_name)
+	// fmt.Println(input)
+	// fmt.Println(guard)
+	// fmt.Println(obstacles)
+
+	_, path := walk(input, guard, obstacles)
+	// debug(input, path)
+	fmt.Println("p1", len(path))
+
+	p2 := 0
 	for i := 1; i < len(path); i++ {
 		// if i%100 == 0 {
 		// 	fmt.Println(i)
 		// }
-		new_obstacle := Pair{
+		dummy_obs := Pos{
 			path[i].x,
 			path[i].y,
-			-1.0,
+			-1,
 		}
+		new_obstacles := append(obstacles, dummy_obs)
 		// fmt.Println("New obstacle: ", new_obstacle)
-		if slices.Contains(possible_obstacles, new_obstacle) {
-			continue
+		valid, _ := walk(input, guard, new_obstacles)
+		if !valid {
+			p2++
 		}
-		obstacles = append(obstacles, new_obstacle)
-		guard = orig_guard
-		new_input := []string{}
-		for _, line := range orig_input {
-			new_input = append(new_input, line)
-			// fmt.Println(line)
-		}
-		new_path := []Pair{}
-		for {
-			err, guard = next_step(new_input, guard, obstacles, new_path)
-			if !err {
-				if (guard == Pair{}) {
-					possible_obstacles = append(possible_obstacles, new_obstacle)
-					// fmt.Println("Possible obstacles: ", new_obstacle)
-					// for _, line := range new_input {
-					// 	fmt.Println(line)
-					// }
-				}
-				break
-			}
-			// fmt.Println(guard)
-			new_path = append(new_path, guard)
-		}
-		// Remove the obstacle
-		obstacles = obstacles[:len(obstacles)-1]
+		// fmt.Println(guard)
 	}
-	fmt.Println(len(possible_obstacles))
+	fmt.Println("p2", p2)
 }
