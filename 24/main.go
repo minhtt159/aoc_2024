@@ -3,10 +3,11 @@ package main
 import (
 	_ "embed"
 	"fmt"
+	"log"
 	"regexp"
 	"slices"
-	"sort"
 	"strconv"
+	"unicode/utf8"
 )
 
 //go:embed input.txt
@@ -28,17 +29,39 @@ x01 XOR y01 -> z01
 x02 OR y02 -> z02
 `
 
-func parseInput(input string) (map[string]int, [][]string) {
+var small_input2 = `
+x00: 0
+x01: 1
+x02: 0
+x03: 1
+x04: 0
+x05: 1
+y00: 0
+y01: 0
+y02: 1
+y03: 1
+y04: 0
+y05: 1
+
+x00 AND y00 -> z05
+x01 AND y01 -> z02
+x02 AND y02 -> z01
+x03 AND y03 -> z03
+x04 AND y04 -> z04
+x05 AND y05 -> z00
+`
+
+type Pair struct {
+	a  string
+	b  string
+	op string
+}
+
+func parseInput(input string) (map[string]int, map[string]Pair) {
 	r1 := regexp.MustCompile(`(.*): (\d)`)
 	r2 := regexp.MustCompile(`(.*) (AND|OR|XOR) (.*) -> (.*)`)
 	listConns := r1.FindAllStringSubmatch(input, -1)
 	listGates := r2.FindAllStringSubmatch(input, -1)
-	// listGates := [][]string{}
-	// for _, line := range strings.Split(input, "\n") {
-	// 	if G := r2.FindAllStringSubmatch(line, -1); G != nil {
-	// 		listGates = append(listGates, G[0])
-	// 	}
-	// }
 
 	connMap := make(map[string]int)
 	for _, conn := range listConns {
@@ -49,57 +72,108 @@ func parseInput(input string) (map[string]int, [][]string) {
 		}
 	}
 
-	return connMap, listGates
+	gateMap := make(map[string]Pair)
+	for _, gate := range listGates {
+		thisGate := Pair{gate[1], gate[3], gate[2]}
+		gateMap[gate[4]] = thisGate
+	}
+
+	return connMap, gateMap
+}
+
+func getVal(gate string, connMap map[string]int, gateMap map[string]Pair) int {
+	pair := gateMap[gate]
+	a, b := pair.a, pair.b
+	var val_a, val_b int
+
+	if gate_b, ok := connMap[b]; !ok {
+		val_b = getVal(b, connMap, gateMap)
+	} else {
+		val_b = gate_b
+	}
+
+	if gate_a, ok := connMap[a]; !ok {
+		val_a = getVal(a, connMap, gateMap)
+	} else {
+		val_a = gate_a
+	}
+
+	switch pair.op {
+	case "AND":
+		return val_a & val_b
+	case "OR":
+		return val_a | val_b
+	case "XOR":
+		return val_a ^ val_b
+	default:
+		log.Fatalf("Unknown operator: %s", pair.op)
+		return -1
+	}
+}
+
+func convert(token byte, val map[string]int) (int, string) {
+	arr_token := []string{}
+	for k := range val {
+		// ret = string(val[k]+48) + ret
+		if k[0] == token {
+			arr_token = append(arr_token, k)
+		}
+	}
+	slices.Sort(arr_token)
+
+	ret_str := ""
+	for _, k := range arr_token {
+		ret_str = string(val[k]+48) + ret_str
+	}
+	ret_int, _ := strconv.ParseInt(ret_str, 2, 64)
+	return int(ret_int), ret_str
+}
+
+func Reverse(s string) string {
+	size := len(s)
+	buf := make([]byte, size)
+	for start := 0; start < size; {
+		r, n := utf8.DecodeRuneInString(s[start:])
+		start += n
+		utf8.EncodeRune(buf[size-start:], r)
+	}
+	return string(buf)
 }
 
 func main() {
 	// input := ex_input
-	// input := small_input
-	input := real_input
+	input := small_input2
+	// input := real_input
 	mapConn, listGates := parseInput(input)
-	// for _, gate := range listGates {
-	// 	fmt.Println(gate)
-	// }
 
-	i := 0
-	for len(listGates) > 0 {
-		i++
-		if i >= len(listGates) {
-			i = 0
-		}
-		thisGate := listGates[i]
-		if _, ok := mapConn[thisGate[1]]; !ok {
-			continue
-		} else if _, ok := mapConn[thisGate[3]]; !ok {
-			continue
-		}
-		switch thisGate[2] {
-		case "AND":
-			mapConn[thisGate[4]] = mapConn[thisGate[1]] & mapConn[thisGate[3]]
-		case "OR":
-			mapConn[thisGate[4]] = mapConn[thisGate[1]] | mapConn[thisGate[3]]
-		case "XOR":
-			mapConn[thisGate[4]] = mapConn[thisGate[1]] ^ mapConn[thisGate[3]]
-		}
-		listGates = append(listGates[:i], listGates[i+1:]...)
+	ret := make(map[string]int)
+	for k := range listGates {
+		ret[k] = getVal(k, mapConn, listGates)
 	}
 
-	sortedConnKey := []string{}
-	for k := range mapConn {
-		// Get all gates starts with z
-		sortedConnKey = append(sortedConnKey, k)
-	}
-	sort.Strings(sortedConnKey)
-	slices.Reverse(sortedConnKey)
+	int_z, str_z := convert('z', ret)
+	fmt.Println("Part 1:", int_z, str_z)
 
-	ret := 0
-	for _, k := range sortedConnKey {
-		if k[0] != 'z' {
+	// part 2
+	int_x, str_x := convert('x', mapConn)
+	int_y, str_y := convert('y', mapConn)
+	fmt.Println(int_x, str_x)
+	fmt.Println(int_y, str_y)
+	int_z2 := int_x + int_y
+	str_z2 := Reverse(strconv.FormatInt(int64(int_z2), 2))
+	fmt.Println(int_z2, str_z2)
+
+	for i := range ret {
+		index, _ := strconv.Atoi(i[1:])
+		if index > len(str_z2) || index > len(str_z) {
 			continue
 		}
-		fmt.Println(k, mapConn[k])
-		ret += mapConn[k]
-		ret <<= 1
+		if str_z2[index] != str_z[index] {
+			fmt.Println(index, str_z2[index], str_z[index])
+		}
 	}
-	fmt.Println(strconv.FormatInt(int64(ret), 2), ret>>1)
+}
+
+// NOTE: https://en.wikipedia.org/wiki/Adder_(electronics)#Ripple-carry_adder
+func rca(i int, listGates map[string]Pair, swapped []string) (int, int) {
 }
